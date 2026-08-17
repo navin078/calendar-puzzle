@@ -4,11 +4,13 @@ A fast, flexible computational solver for the daily physical **Calendar Polyomin
 
 Given any combination of **Month**, **Day of the Month**, and **Day of the Week**, this program arranges the physical puzzle pieces to cover every playable cell on the board while leaving **only** the 3 target date cells exposed.
 
+The architecture is **completely decoupled and instance-agnostic**: solver algorithms are generic, while board layouts, pieces, orientations, display representations, and date mappers live inside instance-specific directories (e.g. `instance1/`).
+
 ---
 
-## 📅 Board Layout
+## 📅 Board Layout (Instance 1)
 
-The puzzle board consists of an $8 \times 7$ grid containing **50 playable cells**:
+The standard puzzle board consists of an $8 \times 7$ grid containing **50 playable cells**:
 
 ```
 +-----+-----+-----+-----+-----+-----+-----+
@@ -32,7 +34,7 @@ The puzzle board consists of an $8 \times 7$ grid containing **50 playable cells
 
 ---
 
-## 🧩 Physical Pieces
+## 🧩 Physical Pieces (Instance 1)
 
 The puzzle uses **10 polyomino pieces** totaling **47 cells** (exactly $50 - 3 = 47$ cells to cover):
 
@@ -52,7 +54,29 @@ The puzzle uses **10 polyomino pieces** totaling **47 cells** (exactly $50 - 3 =
 
 ---
 
-## 🚀 Quick Start
+## 🔄 Generating Shape Orientations (`generate_orientations.py`)
+
+`generate_orientations.py` takes the base 2D shapes defined in an instance folder and automatically generates all unique orientations using the full dihedral symmetry group ($D_4$: 4 rotations $\times$ 2 reflections). It also manages single-character display IDs for visual board rendering and writes the result to `orientations.json`.
+
+### Usage:
+```bash
+# Generate orientations for default instance (instance1)
+python3 generate_orientations.py
+
+# Generate orientations for a specific instance
+python3 generate_orientations.py --instance instance1
+```
+
+### Adding a New Puzzle Variant / Instance:
+1. Create a new folder (e.g. `instance2/`).
+2. Add `calendar.json` (grid and labels) and `date_mapper.py`.
+3. Add `base_shapes.json` containing 1 base 2D matrix per physical piece.
+4. Run `python3 generate_orientations.py --instance instance2`.
+5. Solve with `python3 solver.py --instance instance2`.
+
+---
+
+## 🚀 Quick Start (Solver)
 
 ### 1. Solve for Today's Date
 By default, running without arguments solves for the current date:
@@ -77,27 +101,27 @@ python3 solver.py --month AUG --day 17 --weekday MON --one
 
 Sample ASCII Output:
 ```
-Solving for Target: AUG 17, MON
+Solving for Target: AUG 17, MON [instance1]
 Target coordinates: [(1, 1), (4, 2), (6, 4)]
 
-Found 1 solution(s) in 1.76 ms:
+Found 1 solution(s) in 1.21 ms:
 
 +---+---+---+---+---+---+---+
-| I | I | I | I | B | N |   |
+| N | N | N | T | T | T |   |
 +---+---+---+---+---+---+---+
-| L |AUG| P | P | B | N |   |
+| S |AUG| N | N | T | Z |   |
 +---+---+---+---+---+---+---+
-| L | P | P | P | B | N | N |
+| S | S | S | L | T | Z | Z |
 +---+---+---+---+---+---+---+
-| L | L | S | S | B | B | N |
+| B | B | S | L | L | L | Z |
 +---+---+---+---+---+---+---+
-| U | U |17 | S | V | V | V |
+| B | P |17 | I | I | I | I |
 +---+---+---+---+---+---+---+
-| U | Z | Z | S | S | T | V |
+| B | P | P | U | U | U | V |
 +---+---+---+---+---+---+---+
-| U | U | Z | Z |MON| T | V |
+| B | P | P | U |MON| U | V |
 +---+---+---+---+---+---+---+
-|   |   |   |   | T | T | T |
+|   |   |   |   | V | V | V |
 +---+---+---+---+---+---+---+
 
 Pieces Legend: L=L, B=Big L, I=I, U=U, P=P, T=T, Z=Z, N=Big Z, S=S, V=Flat L
@@ -121,7 +145,7 @@ python3 solver.py --month AUG --day 17 --weekday MON --all
 
 Run the test suite:
 ```bash
-python3 -c "import test_solver; test_solver.test_date_mapper(); test_solver.test_solver_aug_17_mon(); print('All tests passed!')"
+python3 -c "import test_solver; test_solver.test_instance1_date_mapper(); test_solver.test_solver_aug_17_mon(); test_solver.test_solve_one_helper(); print('All tests passed!')"
 ```
 
 ---
@@ -130,17 +154,18 @@ python3 -c "import test_solver; test_solver.test_date_mapper(); test_solver.test
 
 ```
 calendar-puzzle/
-├── README.md                  # Project documentation
+├── README.md                  # Project documentation & guides
 ├── .gitignore                 # Git ignore rules
-├── solver.py                  # DateMapper, CalendarSolver, ASCII formatter & CLI
-├── generate_orientations.py   # Computes 54 D4 rotations/reflections from base shapes
+├── solver.py                  # Generic, puzzle-agnostic backtracking solver & CLI
+├── generate_orientations.py   # Computes D4 rotations/reflections and display IDs
 ├── test_solver.py             # Validation and constraint tests
 ├── docs/
 │   └── puzzle.txt             # Initial puzzle description & conjecture specification
-└── instance1/                 # Data definitions for standard board
+└── instance1/                 # Data and mapping definitions for Instance 1
     ├── calendar.json          # 8x7 board binary matrix and label mappings
     ├── base_shapes.json       # 10 base piece 2D matrices
-    └── orientations.json      # 54 precomputed static orientations
+    ├── orientations.json      # 54 precomputed static orientations & display IDs
+    └── date_mapper.py         # Instance 1 specific date-to-coordinate mapping
 ```
 
 ---

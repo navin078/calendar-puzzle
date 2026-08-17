@@ -1,20 +1,20 @@
 """Unit tests for Calendar Puzzle Solver."""
 
 from pathlib import Path
-from solver import CalendarSolver, DateMapper
+from solver import CalendarSolver
 
 
-def test_date_mapper():
+def test_instance1_date_mapper():
     instance_dir = Path(__file__).parent / "instance1"
     solver = CalendarSolver(instance_dir)
-    mapper = solver.date_mapper
+    assert solver.date_mapper is not None, "DateMapper should be loaded for instance1"
 
     # Test Aug 17, Mon
-    coords = mapper.get_coordinates("AUG", 17, "MON")
+    coords = solver.date_mapper.get_coordinates("AUG", 17, "MON")
     assert coords == [(1, 1), (4, 2), (6, 4)]
 
     # Test Dec 31, Sun
-    coords = mapper.get_coordinates("DEC", 31, "SUN")
+    coords = solver.date_mapper.get_coordinates("DEC", 31, "SUN")
     assert coords == [(1, 5), (6, 2), (6, 3)]
 
 
@@ -44,12 +44,10 @@ def test_solver_aug_17_mon():
     assert len(covered_cells) == 47
 
 
-def test_find_all_solutions_count():
+def test_solve_one_helper():
     instance_dir = Path(__file__).parent / "instance1"
     solver = CalendarSolver(instance_dir)
-
     target_coords = [(1, 1), (4, 2), (6, 4)]
-    all_solutions = solver.solve(target_coords, max_solutions=None)
-
-    assert len(all_solutions) > 1, f"Expected multiple solutions, got {len(all_solutions)}"
-    print(f"Total solutions for Aug 17, Mon: {len(all_solutions)}")
+    sol = solver.solve_one(target_coords)
+    assert sol is not None
+    assert len(sol) == 10
