@@ -227,6 +227,12 @@ class CalendarSolver:
 
         yield from search()
 
+    def solve_one(self, target_coords: List[Coordinate]) -> Optional[Dict[str, List[Coordinate]]]:
+        """Find and return the very first solution immediately."""
+        for sol in self.solve_generator(target_coords, max_solutions=1):
+            return sol
+        return None
+
     def format_solution(
         self, solution: Dict[str, List[Coordinate]], target_coords: List[Coordinate]
     ) -> str:
@@ -270,6 +276,7 @@ def main():
     parser.add_argument("--day", type=int, help="Target day of month (1-31)")
     parser.add_argument("--weekday", type=str, help="Target day of week (e.g. MON)")
     parser.add_argument("--date", type=str, help="Target date in YYYY-MM-DD format (uses current date if none provided)")
+    parser.add_argument("--one", "--first", action="store_true", help="Stop immediately at first solution and print ASCII grid (default)")
     parser.add_argument("--all", action="store_true", help="Find all solutions")
     parser.add_argument("--limit", type=int, default=None, help="Maximum number of solutions to find")
     parser.add_argument("--instance", type=str, default="instance1", help="Instance directory name")
@@ -313,7 +320,8 @@ def main():
     print(f"Found {len(solutions)} solution(s) in {elapsed_ms:.2f} ms:\n")
 
     for idx, sol in enumerate(solutions, 1):
-        print(f"--- Solution #{idx} ---")
+        if len(solutions) > 1:
+            print(f"--- Solution #{idx} ---")
         print(solver.format_solution(sol, target_coords))
         print()
 
