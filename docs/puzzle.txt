@@ -1,0 +1,283 @@
+# Calendar Puzzle Solver
+
+## 1. Goal
+
+Write a Python program that can determine whether a particular **month / date / day-of-week combination** can be uncovered on the physical calendar puzzle using the available set of shapes.
+
+The puzzle consists of:
+
+* A fixed 2D calendar grid containing the days, dates, and other cells.
+* A collection of physical shapes that can be placed on the grid.
+* The shapes are intended to cover all cells except the three cells corresponding to the desired:
+
+  * month
+  * date
+  * day of week
+
+The conjecture is that **every valid combination of month, date, and day of week can be produced by some arrangement of the shapes**.
+
+This program is intended to test that conjecture computationally.
+
+So far, after manually solving the puzzle for nearly a year, no combination has been found that cannot be solved. The program will provide a systematic way to test this rather than relying on manual experimentation.
+
+---
+
+## 2. Representation of the Calendar
+
+The calendar will be represented manually as a 2D matrix.
+
+Each cell in the matrix represents one physical location on the puzzle board.
+
+For example, conceptually:
+
+```text
+calendar = [
+    [...],
+    [...],
+    [...],
+    ...
+]
+```
+
+The actual values stored in the matrix should distinguish between:
+
+* cells that are part of the playable board
+* cells that are not part of the board
+* the three cells corresponding to the target month/date/day
+
+The exact encoding can be decided during implementation. The important requirement is that the geometry of the physical board is represented accurately.
+
+---
+
+## 3. Representation of Shapes
+
+Each physical puzzle piece will also be represented as a 2D matrix.
+
+A shape matrix identifies the cells occupied by the piece.
+
+For example:
+
+```text
+shape = [
+    [1, 1, 1],
+    [1, 0, 0]
+]
+```
+
+where `1` represents a cell covered by the shape and `0` represents empty space within its bounding box.
+
+The shapes will be entered manually.
+
+### Transformations
+
+The physical pieces can be rotated and reflected.
+
+Rather than having the program calculate these transformations initially, all valid orientations will be generated manually and supplied to the solver.
+
+Therefore, each physical piece will be represented as an array of 2D arrays:
+
+```text
+shape_1 = [
+    orientation_1,
+    orientation_2,
+    orientation_3,
+    ...
+]
+```
+
+Each orientation should be normalized to its own bounding box so that the solver only needs to consider its position on the calendar.
+
+If two transformations produce identical shapes, duplicate orientations do not need to be included.
+
+---
+
+## 4. Definition of a Problem
+
+A particular puzzle instance can be defined simply by the three cells that must remain uncovered.
+
+Conceptually:
+
+```text
+problem = [
+    month_coordinate,
+    date_coordinate,
+    weekday_coordinate
+]
+```
+
+For example, the problem might specify:
+
+```text
+[(2, 3), (5, 6), (8, 1)]
+```
+
+The meaning of those coordinates is determined by the manually defined calendar matrix.
+
+The solver's task is therefore:
+
+> Place every puzzle piece on the calendar such that the three specified cells remain uncovered and every other playable cell is covered exactly once.
+
+---
+
+## 5. Solver
+
+The initial implementation can use a straightforward **brute-force / backtracking search**.
+
+For each problem:
+
+1. Mark the three target cells as unavailable to the pieces.
+2. Select a shape that has not yet been placed.
+3. Iterate through every orientation of that shape.
+4. Iterate through every possible position of that orientation on the calendar.
+5. Reject placements that:
+
+   * extend outside the playable board
+   * overlap an already-covered cell
+   * cover one of the three target cells
+6. For every valid placement:
+
+   * place the shape
+   * recursively continue with the remaining shapes
+7. If all shapes have been placed successfully, a solution has been found.
+8. If no placement works, backtrack and try the next possibility.
+
+A solution therefore consists of one valid placement for every physical shape.
+
+---
+
+## 6. What Constitutes a Valid Solution
+
+A solution is valid if:
+
+* Every physical shape is used exactly once.
+* Every shape is placed in one of its valid orientations.
+* Every shape lies entirely within the playable calendar area.
+* No two shapes overlap.
+* None of the three target cells is covered.
+* Every other playable cell is covered exactly once.
+
+The solver does not need to find all solutions initially.
+
+It only needs to answer:
+
+> **Does a solution exist, and if so, give me one?**
+
+Finding all solutions can be added later if useful.
+
+---
+
+## 7. Expected Search Strategy
+
+The first version should deliberately favor simplicity over optimization.
+
+A basic recursive backtracking solver is sufficient because:
+
+* The number of shapes is relatively small.
+* Each shape has a limited number of orientations.
+* The board is small.
+* We only need to determine whether a solution exists.
+
+However, the implementation should be structured so that the search strategy can later be improved if brute force turns out to be slower than expected.
+
+Potential optimizations include:
+
+* Choosing the next shape intelligently rather than always using a fixed order.
+* Precomputing all legal placements of each orientation.
+* Choosing the most constrained uncovered cell first.
+* Representing occupied cells as bitmasks.
+* Eliminating symmetrically equivalent searches where appropriate.
+
+These are **future optimizations**, not requirements for the first implementation.
+
+---
+
+## 8. Testing the Conjecture
+
+Once the solver works for an individual problem, it can be used to test the larger conjecture.
+
+The eventual test should generate every valid combination of:
+
+* month
+* date
+* day of week
+
+and run the solver for each one.
+
+For each combination, record:
+
+```text
+month / date / weekday -> solvable / unsolvable
+```
+
+Ideally, the program should also retain at least one solution for each solvable combination.
+
+The interesting result is not merely that the program finds many solutions. The important question is whether **any valid calendar combination has zero solutions**.
+
+If every combination is solvable, that provides computational evidence for the conjecture.
+
+If one combination fails, that gives a concrete counterexample that can be investigated manually.
+
+---
+
+## 9. Separation of Data and Solver
+
+The calendar geometry, shape definitions, and solver logic should be kept separate.
+
+Conceptually:
+
+```text
+Calendar definition
+        +
+Shape definitions
+        +
+Target cells
+        ↓
+      Solver
+        ↓
+   Solution / No solution
+```
+
+This will make it easy to:
+
+* correct the manually entered board
+* add or modify shapes
+* add orientations
+* test different target combinations
+* reuse the solver independently of the particular physical puzzle
+
+---
+
+## 10. Initial Scope
+
+The first version should **not** attempt to be clever.
+
+It should:
+
+1. Accept a manually defined calendar matrix.
+2. Accept manually defined shape orientations.
+3. Accept three target coordinates.
+4. Search for a valid placement of all shapes.
+5. Print or otherwise return the first solution found.
+6. Clearly report when no solution exists.
+
+Once that works reliably for known manually solved cases, the next step is to run it across the entire set of possible calendar combinations.
+
+The goal of the first implementation is therefore not maximum performance. It is to build a trustworthy computational model of the physical puzzle.
+
+## 11. Important Assumption
+
+The correctness of the solver depends heavily on the manually entered representations.
+
+In particular, the following need to be verified carefully:
+
+* Calendar cell coordinates.
+* Which cells are actually playable.
+* Shape geometry.
+* All valid rotations.
+* All valid reflections.
+* The interpretation of the three target cells.
+
+A solver reporting "no solution" is only meaningful if those inputs faithfully represent the physical puzzle.
+
+This makes it useful to test the program first against several combinations that are already known to have been solved physically.
+

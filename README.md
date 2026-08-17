@@ -1,0 +1,3 @@
+# Calendar Puzzle
+
+Project initialized.
