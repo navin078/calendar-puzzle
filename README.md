@@ -4,7 +4,7 @@ A fast, flexible computational solver for the daily physical **Calendar Polyomin
 
 Given any combination of **Month**, **Day of the Month**, and **Day of the Week**, this program arranges the physical puzzle pieces to cover every playable cell on the board while leaving **only** the 3 target date cells exposed.
 
-The architecture is **completely decoupled and instance-agnostic**: solver algorithms are generic, while board layouts, pieces, orientations, display representations, and date mappers live inside instance-specific directories (e.g. `instance1/`).
+The architecture is **completely decoupled and instance-agnostic**: solver algorithms are generic, while board layouts, pieces, orientations, color pairings, display representations, and date mappers live inside instance-specific directories (e.g. `instance1/`).
 
 ---
 
@@ -34,23 +34,18 @@ The standard puzzle board consists of an $8 \times 7$ grid containing **50 playa
 
 ---
 
-## 🧩 Physical Pieces (Instance 1)
+## 🎨 Physical Pieces & Color Pairings (Instance 1)
 
-The puzzle uses **10 polyomino pieces** totaling **47 cells** (exactly $50 - 3 = 47$ cells to cover):
+The puzzle uses **10 polyomino pieces** grouped into **5 colors** (2 pieces per color), totaling **47 cells** (exactly $50 - 3 = 47$ cells to cover):
 
-| ID | Piece Name | Polyomino Type | Cells | Orientations (Rotations + Flips) |
-|:---:|:---|:---|:---:|:---:|
-| **L** | `L` | Tetromino | 4 | 8 |
-| **B** | `Big L` | Pentomino | 5 | 8 |
-| **I** | `I` | Tetromino | 4 | 2 |
-| **U** | `U` | Pentomino | 5 | 4 |
-| **P** | `P` | Pentomino | 5 | 8 |
-| **T** | `T` | Pentomino | 5 | 4 |
-| **Z** | `Z` | Tetromino | 4 | 4 |
-| **N** | `Big Z` | Pentomino | 5 | 8 |
-| **S** | `S` | Pentomino | 5 | 4 |
-| **V** | `Flat L` (Corner) | Pentomino | 5 | 4 |
-| **Total** | **10 Pieces** | | **47 Cells** | **54 Unique Orientations** |
+| Color | Pieces | Shapes & IDs | Cells | Unique Orientations |
+|:---|:---|:---:|:---:|:---:|
+| ⚪ **White** | `L` (Tetromino) & `Flat L` (Pentomino) | `L` & `V` | 4 + 5 = 9 | 8 + 4 = 12 |
+| 🟠 **Orange** | `Big L` (Pentomino) & `I` (Tetromino) | `B` & `I` | 5 + 4 = 9 | 8 + 2 = 10 |
+| 🟡 **Yellow** | `S` (Pentomino) & `P` (Pentomino) | `S` & `P` | 5 + 5 = 10 | 4 + 8 = 12 |
+| 🔴 **Red** | `T` (Pentomino) & `Big Z` (Pentomino) | `T` & `N` | 5 + 5 = 10 | 4 + 8 = 12 |
+| 🟣 **Purple** | `U` (Pentomino) & `Z` (Tetromino) | `U` & `Z` | 5 + 4 = 9 | 4 + 4 = 8 |
+| **Total** | **5 Color Pairs** | **10 Pieces** | **47 Cells** | **54 Orientations** |
 
 ---
 
@@ -67,19 +62,11 @@ python3 generate_orientations.py
 python3 generate_orientations.py --instance instance1
 ```
 
-### Adding a New Puzzle Variant / Instance:
-1. Create a new folder (e.g. `instance2/`).
-2. Add `calendar.json` (grid and labels) and `date_mapper.py`.
-3. Add `base_shapes.json` containing 1 base 2D matrix per physical piece.
-4. Run `python3 generate_orientations.py --instance instance2`.
-5. Solve with `python3 solver.py --instance instance2`.
-
 ---
 
 ## 🚀 Quick Start (Solver)
 
 ### 1. Solve for Today's Date
-By default, running without arguments solves for the current date:
 ```bash
 python3 solver.py
 ```
@@ -94,37 +81,45 @@ Or using an ISO date string:
 python3 solver.py --date 2026-08-17
 ```
 
-### 3. Stop at First Solution (Default / Fast)
+### 3. Solve with Color-Pair Adjacency Constraint (`--color-adjacent`)
+Requires that both pieces of each color touch each other edge-to-edge on the board:
 ```bash
-python3 solver.py --month AUG --day 17 --weekday MON --one
+python3 solver.py --month AUG --day 17 --weekday MON --color-adjacent
 ```
 
 Sample ASCII Output:
 ```
-Solving for Target: AUG 17, MON [instance1]
+Solving for Target: AUG 17, MON [instance1] [Color-Adjacent]
 Target coordinates: [(1, 1), (4, 2), (6, 4)]
 
-Found 1 solution(s) in 1.21 ms:
+Found 1 solution(s) in 153.55 ms:
 
 +---+---+---+---+---+---+---+
-| N | N | N | T | T | T |   |
+| I | P | P | P | S | S |   |
 +---+---+---+---+---+---+---+
-| S |AUG| N | N | T | Z |   |
+| I |AUG| P | P | B | S |   |
 +---+---+---+---+---+---+---+
-| S | S | S | L | T | Z | Z |
+| I | B | B | B | B | S | S |
 +---+---+---+---+---+---+---+
-| B | B | S | L | L | L | Z |
+| I | N | N | N | L | L | L |
 +---+---+---+---+---+---+---+
-| B | P |17 | I | I | I | I |
+| U | U |17 | N | N | T | L |
 +---+---+---+---+---+---+---+
-| B | P | P | U | U | U | V |
+| U | Z | Z | T | T | T | V |
 +---+---+---+---+---+---+---+
-| B | P | P | U |MON| U | V |
+| U | U | Z | Z |MON| T | V |
 +---+---+---+---+---+---+---+
 |   |   |   |   | V | V | V |
 +---+---+---+---+---+---+---+
 
 Pieces Legend: L=L, B=Big L, I=I, U=U, P=P, T=T, Z=Z, N=Big Z, S=S, V=Flat L
+
+Color Pairs Status:
+  - White   (L=L & V=Flat L): ✓ Touching (Edge)
+  - Orange  (B=Big L & I=I): ✓ Touching (Edge)
+  - Yellow  (S=S & P=P): ✓ Touching (Edge)
+  - Red     (T=T & N=Big Z): ✓ Touching (Edge)
+  - Purple  (U=U & Z=Z): ✓ Touching (Edge)
 ```
 
 ### 4. Find Multiple or All Solutions
@@ -133,11 +128,14 @@ To see $N$ distinct solutions:
 python3 solver.py --month AUG --day 17 --weekday MON --limit 3
 ```
 
-To find and count **all** valid solutions:
+To count all solutions under standard or color-adjacent mode:
 ```bash
+# All standard solutions (e.g. 866 solutions for Aug 17, Mon)
 python3 solver.py --month AUG --day 17 --weekday MON --all
+
+# All color-adjacent solutions (e.g. 6 solutions for Aug 17, Mon)
+python3 solver.py --month AUG --day 17 --weekday MON --color-adjacent --all
 ```
-*(e.g., Aug 17, Mon yields **866 distinct solutions** in ~1.2 seconds)*
 
 ---
 
@@ -145,7 +143,7 @@ python3 solver.py --month AUG --day 17 --weekday MON --all
 
 Run the test suite:
 ```bash
-python3 -c "import test_solver; test_solver.test_instance1_date_mapper(); test_solver.test_solver_aug_17_mon(); test_solver.test_solve_one_helper(); print('All tests passed!')"
+python3 -c "import test_solver; test_solver.test_instance1_date_mapper(); test_solver.test_solver_aug_17_mon(); test_solver.test_solve_one_helper(); test_solver.test_color_adjacent_solving(); print('All tests passed!')"
 ```
 
 ---
@@ -156,37 +154,15 @@ python3 -c "import test_solver; test_solver.test_instance1_date_mapper(); test_s
 calendar-puzzle/
 ├── README.md                  # Project documentation & guides
 ├── .gitignore                 # Git ignore rules
-├── solver.py                  # Generic, puzzle-agnostic backtracking solver & CLI
+├── solver.py                  # Generic backtracking solver & CLI (with color pruning)
 ├── generate_orientations.py   # Computes D4 rotations/reflections and display IDs
-├── test_solver.py             # Validation and constraint tests
+├── test_solver.py             # Validation, constraint, and color-adjacency tests
 ├── docs/
 │   └── puzzle.txt             # Initial puzzle description & conjecture specification
 └── instance1/                 # Data and mapping definitions for Instance 1
     ├── calendar.json          # 8x7 board binary matrix and label mappings
     ├── base_shapes.json       # 10 base piece 2D matrices
+    ├── colors.json            # 5 color pair definitions
     ├── orientations.json      # 54 precomputed static orientations & display IDs
     └── date_mapper.py         # Instance 1 specific date-to-coordinate mapping
-```
-
----
-
-## 💻 Python API
-
-You can also use the solver as a library:
-
-```python
-from pathlib import Path
-from solver import CalendarSolver
-
-solver = CalendarSolver(Path("instance1"))
-target_coords = solver.date_mapper.get_coordinates("AUG", 17, "MON")
-
-# Find first solution
-solution = solver.solve_one(target_coords)
-print(solver.format_solution(solution, target_coords))
-
-# Iterate over all solutions
-for sol in solver.solve_generator(target_coords):
-    # Process solution
-    pass
 ```

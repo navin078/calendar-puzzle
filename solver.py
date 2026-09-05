@@ -1,7 +1,8 @@
 """Calendar Puzzle Solver.
 
 A generic polyomino tiling backtracking solver. Instance-specific date mapping,
-board layout, and shape display representations are loaded directly from the instance folder.
+board layout, shape display representations, and color pairings are loaded directly
+from the instance folder.
 """
 
 import argparse
@@ -29,6 +30,21 @@ def load_instance_date_mapper(instance_dir: Path, labels: List[List[Optional[str
     return None
 
 
+def are_pieces_adjacent(
+    coords1: List[Coordinate], coords2: List[Coordinate], diagonal: bool = False
+) -> bool:
+    """Check if two sets of cells touch (orthogonally by default, or diagonally)."""
+    s2 = set(coords2)
+    for r, c in coords1:
+        neighbors = [(r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)]
+        if diagonal:
+            neighbors.extend([(r + 1, c + 1), (r + 1, c - 1), (r - 1, c + 1), (r - 1, c - 1)])
+        for nr, nc in neighbors:
+            if (nr, nc) in s2:
+                return True
+    return False
+
+
 class CalendarSolver:
     """Generic backtracking solver for calendar polyomino puzzles."""
 
@@ -48,6 +64,22 @@ class CalendarSolver:
         else:
             self.raw_orientations = orientations_data
             self.shape_display_ids = {k: k[0] for k in self.raw_orientations}
+
+        # Load color pairs if present
+        colors_path = instance_dir / "colors.json"
+        self.color_pairs: Dict[str, List[str]] = {}
+        self.shape_to_partner: Dict[str, str] = {}
+        self.shape_to_color: Dict[str, str] = {}
+        if colors_path.exists():
+            with open(colors_path, "r") as f:
+                self.color_pairs = json.load(f)
+            for color, shapes in self.color_pairs.items():
+                if len(shapes) == 2:
+                    s1, s2 = shapes
+                    self.shape_to_partner[s1] = s2
+                    self.shape_to_partner[s2] = s1
+                    self.shape_to_color[s1] = color
+                    self.shape_to_color[s2] = color
 
         self.rows = len(self.grid_template)
         self.cols = len(self.grid_template[0])
@@ -73,20 +105,60 @@ class CalendarSolver:
 
         self.shape_names = list(self.shape_offsets.keys())
 
+    def is_color_adjacent(
+        self, solution: Dict[str, List[Coordinate]], diagonal: bool = False
+    ) -> bool:
+        """Verify that all same-colored piece pairs touch in the solution."""
+        if not self.color_pairs:
+            return True
+        for color, shapes in self.color_pairs.items():
+            if len(shapes) == 2:
+                s1, s2 = shapes
+                if s1 not in solution or s2 not in solution:
+                    return False
+                if not are_pieces_adjacent(solution[s1], solution[s2], diagonal=diagonal):
+                    return False
+        return True
+
     def solve(
-        self, target_coords: List[Coordinate], max_solutions: Optional[int] = None
+        self,
+        target_coords: List[Coordinate],
+        max_solutions: Optional[int] = None,
+        require_color_adjacency: bool = False,
+        diagonal_adjacency: bool = False,
     ) -> List[Dict[str, List[Coordinate]]]:
         """Find solutions for the given target coordinates."""
-        return list(self.solve_generator(target_coords, max_solutions=max_solutions))
+        return list(
+            self.solve_generator(
+                target_coords,
+                max_solutions=max_solutions,
+                require_color_adjacency=require_color_adjacency,
+                diagonal_adjacency=diagonal_adjacency,
+            )
+        )
 
-    def solve_one(self, target_coords: List[Coordinate]) -> Optional[Dict[str, List[Coordinate]]]:
+    def solve_one(
+        self,
+        target_coords: List[Coordinate],
+        require_color_adjacency: bool = False,
+        diagonal_adjacency: bool = False,
+    ) -> Optional[Dict[str, List[Coordinate]]]:
         """Find and return the very first solution immediately."""
-        for sol in self.solve_generator(target_coords, max_solutions=1):
+        for sol in self.solve_generator(
+            target_coords,
+            max_solutions=1,
+            require_color_adjacency=require_color_adjacency,
+            diagonal_adjacency=diagonal_adjacency,
+        ):
             return sol
         return None
 
     def solve_generator(
-        self, target_coords: List[Coordinate], max_solutions: Optional[int] = None
+        self,
+        target_coords: List[Coordinate],
+        max_solutions: Optional[int] = None,
+        require_color_adjacency: bool = False,
+        diagonal_adjacency: bool = False,
     ) -> Generator[Dict[str, List[Coordinate]], None, None]:
         """Generator that yields solutions one by one using cell-first backtracking."""
         # Initialize board: 1 = empty playable cell, 0 = blocked / covered / out-of-bounds
@@ -128,6 +200,7 @@ class CalendarSolver:
             # Try every unused shape
             for shape_name in list(unused_shapes):
                 unused_shapes.remove(shape_name)
+                partner = self.shape_to_partner.get(shape_name)
 
                 # Try every orientation of this shape
                 for offsets in self.shape_offsets[shape_name]:
@@ -140,6 +213,11 @@ class CalendarSolver:
                         else:
                             can_place = False
                             break
+
+                    # Search-time pruning for color adjacency constraint
+                    if can_place and require_color_adjacency and partner and (partner in placed_shapes):
+                        if not are_pieces_adjacent(placed_cells, placed_shapes[partner], diagonal=diagonal_adjacency):
+                            can_place = False
 
                     if can_place:
                         # Place the shape
@@ -166,9 +244,12 @@ class CalendarSolver:
         yield from search()
 
     def format_solution(
-        self, solution: Dict[str, List[Coordinate]], target_coords: List[Coordinate]
+        self,
+        solution: Dict[str, List[Coordinate]],
+        target_coords: List[Coordinate],
+        show_colors: bool = False,
     ) -> str:
-        """Format a solution into a readable ASCII grid using instance-defined display IDs."""
+        """Format a solution into a readable ASCII grid with optional color pair status."""
         display_grid = [["." if self.grid_template[r][c] == 1 else " " for c in range(self.cols)]
                         for r in range(self.rows)]
 
@@ -199,6 +280,28 @@ class CalendarSolver:
         # Legend
         legend_items = [f"{self.shape_display_ids.get(name, name[0])}={name}" for name in self.shape_names]
         lines.append("\nPieces Legend: " + ", ".join(legend_items))
+
+        # Color Pairs Breakdown
+        if self.color_pairs and show_colors:
+            lines.append("\nColor Pairs Status:")
+            for color, shapes in self.color_pairs.items():
+                if len(shapes) == 2:
+                    s1, s2 = shapes
+                    d1 = self.shape_display_ids.get(s1, s1[0])
+                    d2 = self.shape_display_ids.get(s2, s2[0])
+                    if s1 in solution and s2 in solution:
+                        edge_touch = are_pieces_adjacent(solution[s1], solution[s2], diagonal=False)
+                        diag_touch = are_pieces_adjacent(solution[s1], solution[s2], diagonal=True)
+                        if edge_touch:
+                            status = "✓ Touching (Edge)"
+                        elif diag_touch:
+                            status = "~ Touching (Diagonal only)"
+                        else:
+                            status = "✗ Separated"
+                    else:
+                        status = "Unplaced"
+                    lines.append(f"  - {color:7s} ({d1}={s1} & {d2}={s2}): {status}")
+
         return "\n".join(lines)
 
 
@@ -212,6 +315,16 @@ def main():
     parser.add_argument("--all", action="store_true", help="Find all solutions")
     parser.add_argument("--limit", type=int, default=None, help="Maximum number of solutions to find")
     parser.add_argument("--instance", type=str, default="instance1", help="Instance directory name")
+    parser.add_argument(
+        "--color-adjacent", "--color",
+        action="store_true",
+        help="Require pieces of the same color to touch each other"
+    )
+    parser.add_argument(
+        "--diagonal",
+        action="store_true",
+        help="Allow diagonal/corner touching for color adjacency (default: orthogonal edge-sharing)"
+    )
 
     args = parser.parse_args()
 
@@ -240,17 +353,23 @@ def main():
         today = datetime.date.today()
         target_coords, (m_str, d_str, w_str) = solver.date_mapper.from_date(today)
 
-    print(f"Solving for Target: {m_str} {d_str}, {w_str} [{args.instance}]")
+    mode_info = " [Color-Adjacent]" if args.color_adjacent else ""
+    print(f"Solving for Target: {m_str} {d_str}, {w_str} [{args.instance}]{mode_info}")
     print(f"Target coordinates: {target_coords}\n")
 
     max_sol = None if args.all else (args.limit if args.limit else 1)
 
     start_time = time.perf_counter()
-    solutions = solver.solve(target_coords, max_solutions=max_sol)
+    solutions = solver.solve(
+        target_coords,
+        max_solutions=max_sol,
+        require_color_adjacency=args.color_adjacent,
+        diagonal_adjacency=args.diagonal,
+    )
     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
     if not solutions:
-        print(f"No solution found for {m_str} {d_str}, {w_str} ({elapsed_ms:.2f} ms).")
+        print(f"No solution found for {m_str} {d_str}, {w_str} with requested constraints ({elapsed_ms:.2f} ms).")
         return
 
     print(f"Found {len(solutions)} solution(s) in {elapsed_ms:.2f} ms:\n")
@@ -258,7 +377,7 @@ def main():
     for idx, sol in enumerate(solutions, 1):
         if len(solutions) > 1:
             print(f"--- Solution #{idx} ---")
-        print(solver.format_solution(sol, target_coords))
+        print(solver.format_solution(sol, target_coords, show_colors=bool(solver.color_pairs)))
         print()
 
 

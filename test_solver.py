@@ -51,3 +51,14 @@ def test_solve_one_helper():
     sol = solver.solve_one(target_coords)
     assert sol is not None
     assert len(sol) == 10
+
+
+def test_color_adjacent_solving():
+    instance_dir = Path(__file__).parent / "instance1"
+    solver = CalendarSolver(instance_dir)
+    target_coords = [(1, 1), (4, 2), (6, 4)]
+
+    # Test that color-adjacent solver finds valid solutions
+    sol = solver.solve_one(target_coords, require_color_adjacency=True)
+    assert sol is not None, "Should find a color-adjacent solution for Aug 17, Mon"
+    assert solver.is_color_adjacent(sol, diagonal=False), "All color pairs must touch edge-to-edge"
